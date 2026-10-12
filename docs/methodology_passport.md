@@ -1,3 +1,6 @@
+## Repository
+**GitHub Repository:** https://github.com/elvheaven/ai-artist-labor-research
+
 # Methodology Passport Card
 
 ## Project Title
