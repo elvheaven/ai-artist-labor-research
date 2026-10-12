@@ -1,0 +1,6 @@
+study_id,authors,year,platform_type,metric_name,value_before,value_after,pct_change,has_required_fields
+ST01,Goldberg & Lam,2025,Stock Marketplace,non_ai_asset_sales,1000,680,-32.0,True
+ST02,Hui et al.,2024,Freelance Platform,monthly_earnings,2500,2025,-19.0,True
+ST03,Demirci et al.,2025,Freelance Platform,job_postings,1500,1245,-17.0,True
+ST04,Makridis,2025,National Labor Statistics,aggregate_employment,50000,49800,-0.4,True
+ST05,Jiang et al.,2026,Artist Survey,creative_autonomy_score,8.5,4.2,-50.5,True
