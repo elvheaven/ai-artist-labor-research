@@ -1,0 +1,10 @@
+{
+  "project_name": "ai-artist-labor-research",
+  "data_path": "data/sample/sample_dataset.csv",
+  "output_path": "data/processed/benchmark_results.json",
+  "guardrail_completion_threshold": 100.0,
+  "metrics_to_evaluate": [
+    "pct_change",
+    "has_required_fields"
+  ]
+}
