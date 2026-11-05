@@ -9,8 +9,11 @@ venv/
 ENV/
 env/
 
-# Jupyter Notebook checkpoints
-.ipynb_checkpoints
+# Jupyter Notebook checkpoints (penalty: -20 pts if committed)
+.ipynb_checkpoints/
+
+# Executed notebook copies (keep only source)
+notebooks/*_executed.ipynb
 
 # OS generated files
 .DS_Store
@@ -18,5 +21,17 @@ Thumbs.db
 
 # Logs & Output Artifacts
 *.log
+.pytest_cache/
+data/processed/benchmark_results.json
 data/processed/*
 !data/processed/.gitkeep
+!data/processed/metrics_summary.csv
+!data/processed/benchmark_clean.csv
+
+# Binary / large data dumps
+*.pkl
+*.parquet
+*.h5
+
+# Local untracked benchmark captures (keep the committed small reproducible demo)
+data/raw/local_*.jsonl

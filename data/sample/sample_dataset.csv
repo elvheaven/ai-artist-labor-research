@@ -1,6 +1,8 @@
-study_id,authors,year,platform_type,metric_name,value_before,value_after,pct_change,has_required_fields
-ST01,Goldberg & Lam,2025,Stock Marketplace,non_ai_asset_sales,1000,680,-32.0,True
-ST02,Hui et al.,2024,Freelance Platform,monthly_earnings,2500,2025,-19.0,True
-ST03,Demirci et al.,2025,Freelance Platform,job_postings,1500,1245,-17.0,True
-ST04,Makridis,2025,National Labor Statistics,aggregate_employment,50000,49800,-0.4,True
-ST05,Jiang et al.,2026,Artist Survey,creative_autonomy_score,8.5,4.2,-50.5,True
+study_id,authors,year,platform_type,metric_name,value_before,value_after,pct_change,has_required_fields,research_question,source_bib_key,data_provenance,source_note
+ST01,Goldberg & Lam,2025,Stock Marketplace,non_ai_asset_sales,1000.0,680.0,-32.0,True,RQ2,goldbergGenerativeAiEquilibrium2025,illustrative_unverified,Demonstration; -32% not substantiated by supplied BibTeX metadata
+ST02,Hui et al.,2024,Freelance Platform,monthly_earnings,2500.0,2025.0,-19.0,True,RQ1,huiShortTermEffectsGenerative2024,illustrative_unverified,Demonstration; -19% is not an extracted estimate
+ST03,Demirci et al.,2025,Freelance Platform,image_job_postings,1500.0,1245.0,-17.0,True,RQ1,demirciWhoAIReplacing2025,illustrative_unverified,Illustrative counts; -17% matches reported magnitude but raw counts invented
+ST04,Makridis,2025,National Labor Statistics,aggregate_employment,50000.0,49800.0,-0.4,True,RQ1,LaborMarketEffect,illustrative_unverified,Demonstration; -0.4% not established in BibTeX
+ST05,Jiang et al.,2026,Artist Survey,creative_autonomy_score,8.5,4.2,-50.6,True,RQ3,jiangHowProfessionalVisual2026,illustrative_unverified,Demonstration; -50.6% creative autonomy score not established in BibTeX
+ST06,Zhou & Lee,2024,Digital Art Platform,human_creative_productivity,100.0,125.0,25.0,True,CONTEXT,zhouGenerativeArtificialIntelligence2024,illustrative_unverified,Illustrative counts; +25% matches reported productivity change but raw counts invented
+ST07,Lovato et al.,2024,Artist Survey,career_sustainability_optimism,72.0,31.0,-56.9,True,RQ3,lovatoForegroundingArtistOpinions2024,illustrative_unverified,Demonstration; -56.9% optimism not established in BibTeX
