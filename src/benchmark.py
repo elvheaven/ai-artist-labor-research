@@ -1,17 +1,25 @@
-"""Task 2 descriptive sample audit and Task 3 simulated scenario generator.
+"""Task 2 extraction audit and Task 3 simulated scenario generator.
 
-The 50–250 req/s values are *scenario labels*, not achieved load from a live
-service. Latencies are draws from Gaussian distributions, NOT stopwatch timings.
-The purpose is to test JSONL ingestion, statistics, and visualization. Neither
-these synthetic latencies nor the illustrative study rows test RQ1–RQ3.
+Two separate strands live in this module:
+
+* ``run_benchmark`` audits the REAL secondary data extracted from the
+  bibliography (``data/extracted/*.csv``): schema, provenance, vocabulary and
+  arithmetic re-expression of reported coefficients. It does not pool unlike
+  outcomes and does not run new hypothesis tests.
+* ``generate_raw_benchmark_logs`` creates the SYNTHETIC software-engineering
+  testbed (Gaussian latency draws). The 50-250 req/s values are scenario labels,
+  not achieved load, and nothing there bears on RQ1-RQ3.
 """
 
 import argparse
 import datetime
 import json
 import os
+import math
 import random
+import re
 import sys
+import numpy as np
 import pandas as pd
 
 # Ensure UTF-8 output on Windows
@@ -19,48 +27,117 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf-8-s
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 
-def run_benchmark(config_path: str):
-    """Validate and describe illustrative study rows without false pooled inference.
+EFFECT_REQUIRED = {"effect_id", "bib_key", "rq", "outcome_domain", "outcome", "estimate", "estimate_unit",
+                   "se", "direction", "location_in_source", "verification_status", "source_version"}
+SURVEY_REQUIRED = {"item_id", "bib_key", "rq", "construct", "response_category", "value_pct", "n_total",
+                   "location_in_source", "verification_status"}
+THEME_REQUIRED = {"theme_id", "bib_key", "rq", "theme", "description", "support", "method", "sample",
+                  "location_in_source", "verification_status"}
+VERIFICATION_STATUSES = {"fulltext_cross_checked", "fulltext_single_read", "abstract_or_secondary", "not_retrieved"}
+RQ_LABELS = {"RQ1", "RQ2", "RQ3", "CONTEXT"}
+DIRECTIONS = {"negative", "positive", "no_clear_effect", "mixed", "null_or_positive"}
 
-    The input CSV is an unverified teaching dataset, *not* extracted empirical
-    study estimates. In particular, do not pool % differences across unlike
-    outcomes, nor report p-values from these examples.
+
+def _bib_keys(bib_path: str) -> set:
+    with open(bib_path, "r", encoding="utf-8") as fh:
+        return set(re.findall(r"@\w+\{([^,\s]+),", fh.read()))
+
+
+def _normal_two_sided_p(z: float) -> float:
+    return math.erfc(abs(z) / math.sqrt(2.0))
+
+
+def derive_effect_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Add arithmetic re-expressions of REPORTED estimates (not new inference).
+
+    * ``derived_pct``: exp(b) - 1 in percent, only for log-point / IHS coefficients.
+    * ``z_reported`` and ``p_normal_approx``: estimate / SE with a normal approximation,
+      only where the paper's own SE was extracted. These restate the authors' standard
+      errors; they do not account for clustering beyond what the authors did.
+    """
+    out = df.copy()
+    est = pd.to_numeric(out["estimate"], errors="coerce")
+    se = pd.to_numeric(out["se"], errors="coerce")
+    is_log = out["estimate_unit"].astype(str).str.contains("log points|IHS", case=False, regex=True)
+    out["derived_pct"] = np.where(is_log & est.notna(), (np.exp(est) - 1.0) * 100.0, np.nan)
+    out["z_reported"] = np.where(est.notna() & se.gt(0), est / se, np.nan)
+    out["p_normal_approx"] = [(_normal_two_sided_p(z) if pd.notna(z) else np.nan) for z in out["z_reported"]]
+    return out
+
+
+def run_benchmark(config_path: str):
+    """Audit the extracted real-data files without pooling unlike outcomes.
+
+    Checks schema, unique identifiers, controlled vocabularies, that every ``bib_key``
+    exists in the BibTeX file, and that each row records where it came from. Writes a
+    derived table (percent re-expression of log coefficients, z from reported SE) and a
+    JSON summary. No pooled mean, causal claim, or new hypothesis test is produced.
     """
     with open(config_path, "r", encoding="utf-8") as fh:
         config = json.load(fh)
-    data_file = config.get("data_path", "data/sample/sample_dataset.csv")
-    df = pd.read_csv(data_file)
-    required = {"study_id", "metric_name", "value_before", "value_after",
-                "pct_change", "research_question", "data_provenance", "has_required_fields"}
-    missing = required - set(df.columns)
-    if missing:
-        raise ValueError(f"Sample dataset missing columns: {sorted(missing)}")
-    if df.empty or df["study_id"].duplicated().any():
-        raise ValueError("Study examples must be nonempty and have unique study_id")
-    if (df["value_before"] == 0).any():
-        raise ValueError("Cannot calculate percentage change with zero baseline")
-    calculated = (df["value_after"] - df["value_before"]) / df["value_before"] * 100
-    if not ((calculated - df["pct_change"]).abs() <= 0.15).all():
-        raise ValueError("Sample pct_change does not agree with before/after values")
-    required_fields = ["study_id", "metric_name", "value_before", "value_after", "pct_change"]
-    complete_mask = df[required_fields].notna().all(axis=1) & df["has_required_fields"].eq(True)
-    completeness = 100 * complete_mask.mean()
-    threshold = float(config.get("guardrail_completion_threshold", 95.0))
+    effects = pd.read_csv(config.get("data_path", "data/extracted/effect_estimates.csv"))
+    survey = pd.read_csv(config.get("survey_path", "data/extracted/survey_items.csv"))
+    themes = pd.read_csv(config.get("themes_path", "data/extracted/qualitative_themes.csv"))
+    keys = _bib_keys(config.get("bib_path", "docs/Zhansaya_Zhanerke.bib"))
+
+    for name, frame, required, id_col in (("effect_estimates", effects, EFFECT_REQUIRED, "effect_id"),
+                                          ("survey_items", survey, SURVEY_REQUIRED, None),
+                                          ("qualitative_themes", themes, THEME_REQUIRED, "theme_id")):
+        missing = required - set(frame.columns)
+        if missing:
+            raise ValueError(f"{name}.csv missing columns: {sorted(missing)}")
+        if frame.empty:
+            raise ValueError(f"{name}.csv is empty")
+        if id_col and frame[id_col].duplicated().any():
+            raise ValueError(f"{name}.csv has duplicate {id_col}")
+        if not set(frame["verification_status"]).issubset(VERIFICATION_STATUSES):
+            raise ValueError(f"{name}.csv has unknown verification_status values")
+        if not set(frame["rq"]).issubset(RQ_LABELS):
+            raise ValueError(f"{name}.csv has unknown rq labels")
+        unknown_keys = set(frame["bib_key"]) - keys
+        if unknown_keys:
+            raise ValueError(f"{name}.csv cites bib keys missing from the .bib file: {sorted(unknown_keys)}")
+        if frame["location_in_source"].isna().any():
+            raise ValueError(f"{name}.csv has rows without location_in_source")
+    if not set(effects["direction"]).issubset(DIRECTIONS):
+        raise ValueError("effect_estimates.csv has unknown direction values")
+    numeric = effects["estimate"].notna()
+    if effects.loc[numeric, "estimate_unit"].isna().any():
+        raise ValueError("Every numeric estimate needs an estimate_unit")
+    if (pd.to_numeric(effects["se"], errors="coerce").dropna() <= 0).any():
+        raise ValueError("Reported standard errors must be positive")
+    items = survey.drop_duplicates("item_id")
+    if survey["value_pct"].lt(0).any() or survey["value_pct"].gt(100).any():
+        raise ValueError("Survey percentages must lie in [0, 100]")
+
+    derived = derive_effect_columns(effects)
+    fulltext = effects["verification_status"].isin(["fulltext_cross_checked", "fulltext_single_read"])
+    completeness = 100 * float(fulltext.mean())
+    threshold = float(config.get("guardrail_completion_threshold", 0.0))
     status = "PASSED" if completeness >= threshold else "FAILED"
-    print("[NOTE] Illustrative/unverified study values; descriptive checks only.")
-    print(f"Rows: {len(df)}; data completeness: {completeness:.1f}%; guardrail: {status}")
-    for rq, group in df.groupby("research_question", sort=True):
-        print(f"  {rq}: {len(group)} illustrative row(s) — "
-              + ", ".join(group["metric_name"].astype(str)))
-    print("[NOTE] No pooled mean, causal claim, or hypothesis test is justified by these rows.")
-    output_path = config.get("output_path", "data/processed/benchmark_results.json")
+
+    print("[NOTE] Real secondary data extracted from the bibliography; descriptive audit only.")
+    print(f"Effect rows: {len(effects)} from {effects['bib_key'].nunique()} sources; "
+          f"{completeness:.1f}% read from full text; guardrail: {status}")
+    for rq, group in effects.groupby("rq", sort=True):
+        print(f"  {rq}: {len(group)} effect row(s) from " + ", ".join(sorted(group['bib_key'].unique())))
+    print(f"Survey items: {items['item_id'].nunique()} items, {len(survey)} response rows; "
+          f"qualitative themes: {len(themes)}")
+    print("[NOTE] No pooled mean across outcomes, causal claim, or new hypothesis test is produced here.")
+
+    output_path = config.get("output_path", "data/processed/extraction_audit.json")
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+    derived_path = config.get("derived_path", "data/processed/effect_estimates_derived.csv")
+    derived.to_csv(derived_path, index=False)
     with open(output_path, "w", encoding="utf-8") as fh:
-        json.dump({"status": status, "processed_records": int(len(df)),
-                   "data_completeness_pct": round(float(completeness), 2),
-                   "research_question_counts": {str(k): int(v) for k, v in
-                       df["research_question"].value_counts().items()},
-                   "data_scope": "illustrative_unverified",
+        json.dump({"status": status,
+                   "effect_rows": int(len(effects)),
+                   "survey_response_rows": int(len(survey)),
+                   "qualitative_themes": int(len(themes)),
+                   "fulltext_share_pct": round(completeness, 2),
+                   "verification_counts": {str(k): int(v) for k, v in effects["verification_status"].value_counts().items()},
+                   "research_question_counts": {str(k): int(v) for k, v in effects["rq"].value_counts().items()},
+                   "data_scope": "real_secondary_data_extracted_from_bibliography",
                    "hypothesis_testing_performed": False}, fh, indent=2)
     return status
 

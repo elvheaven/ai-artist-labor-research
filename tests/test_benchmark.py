@@ -14,7 +14,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from src.benchmark import generate_raw_benchmark_logs, run_benchmark
+from src.benchmark import derive_effect_columns, generate_raw_benchmark_logs, run_benchmark
 from src.process_data import (REQUIRED_FIELDS, bootstrap_ci, validate_schema,
     load_jsonl, filter_warmup, handle_errors, detect_outliers_iqr_grouped,
     aggregate_benchmarks, format_markdown_table, guardrail_status)
@@ -137,12 +137,58 @@ class Task3Tests(unittest.TestCase):
         self.assertIn('BREACHED', table)
         self.assertIn('95', table)
 
-    def test_sample_provenance_and_rq_classification(self):
-        sample = pd.read_csv(ROOT/'data/sample/sample_dataset.csv')
-        self.assertEqual(set(sample.research_question), {'RQ1','RQ2','RQ3','CONTEXT'})
-        self.assertTrue(sample.data_provenance.eq('illustrative_unverified').all())
-        self.assertTrue(np.allclose((sample.value_after - sample.value_before) / sample.value_before * 100,
-                                    sample["pct_change"], atol=.15))
+    def test_synthetic_study_rows_removed(self):
+        self.assertFalse((ROOT/'data/sample/sample_dataset.csv').exists())
+
+    def test_extracted_data_provenance_and_vocabulary(self):
+        eff = pd.read_csv(ROOT/'data/extracted/effect_estimates.csv')
+        survey = pd.read_csv(ROOT/'data/extracted/survey_items.csv')
+        themes = pd.read_csv(ROOT/'data/extracted/qualitative_themes.csv')
+        statuses = {'fulltext_cross_checked', 'fulltext_single_read', 'abstract_or_secondary', 'not_retrieved'}
+        bib = (ROOT/'docs/Zhansaya_Zhanerke.bib').read_text(encoding='utf-8')
+        for frame in (eff, survey, themes):
+            self.assertTrue(set(frame.verification_status) <= statuses)
+            self.assertTrue(set(frame.rq) <= {'RQ1', 'RQ2', 'RQ3', 'CONTEXT'})
+            self.assertFalse(frame.location_in_source.isna().any())
+            for key in set(frame.bib_key):
+                self.assertIn('{' + key + ',', bib)
+        self.assertTrue(eff.effect_id.is_unique)
+        self.assertEqual(set(eff[eff.rq == 'RQ2'].bib_key), {'goldbergGenerativeAiEquilibrium2025'})
+
+    def test_derived_percentages_match_papers_own_text(self):
+        eff = derive_effect_columns(pd.read_csv(ROOT/'data/extracted/effect_estimates.csv')).set_index('effect_id')
+        self.assertAlmostEqual(eff.loc['GL-04', 'derived_pct'], -20, delta=1.0)   # paper: about -20%
+        self.assertAlmostEqual(eff.loc['GL-05', 'derived_pct'], -22, delta=1.0)   # paper: about -22%
+        self.assertAlmostEqual(eff.loc['GL-08', 'derived_pct'], 119, delta=1.5)   # paper: about +119%
+        self.assertAlmostEqual(eff.loc['HUI-01', 'derived_pct'], -2.1, delta=0.2) # paper: about -2.1%
+        self.assertAlmostEqual(eff.loc['HUI-02', 'derived_pct'], -5.2, delta=0.3) # paper: about -5.2%
+        self.assertAlmostEqual(eff.loc['TEU-01', 'derived_pct'], -24, delta=1.0)  # paper: about -24%
+        self.assertAlmostEqual(eff.loc['TEU-05', 'derived_pct'], -15, delta=1.0)  # paper: about -15%
+        self.assertTrue(np.isnan(eff.loc['DEM-01', 'z_reported']))  # no SE captured: no derived test
+
+    def test_survey_percentages_are_consistent_where_source_is(self):
+        survey = pd.read_csv(ROOT/'data/extracted/survey_items.csv')
+        likert = survey[survey.item_id.isin(['LOV-Q1', 'LOV-Q2'])]
+        sums = likert.groupby('item_id').value_pct.sum()
+        self.assertTrue(np.allclose(sums, 100.0, atol=0.05))
+        agree = likert[likert.response_category.isin(['Agree', 'Strongly agree'])].groupby('item_id').value_pct.sum()
+        self.assertAlmostEqual(agree['LOV-Q1'], 61.87, places=2)
+        self.assertAlmostEqual(agree['LOV-Q2'], 44.88, places=2)
+
+    def test_audit_runs_and_makes_no_hypothesis_test(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = json.loads((ROOT/'config.json').read_text(encoding='utf-8'))
+            cfg['output_path'] = os.path.join(tmp, 'audit.json')
+            cfg['derived_path'] = os.path.join(tmp, 'derived.csv')
+            for key in ('data_path', 'survey_path', 'themes_path', 'bib_path'):
+                cfg[key] = str(ROOT/cfg[key])
+            cfg_path = os.path.join(tmp, 'config.json')
+            Path(cfg_path).write_text(json.dumps(cfg), encoding='utf-8')
+            self.assertEqual(run_benchmark(cfg_path), 'PASSED')
+            summary = json.loads(Path(cfg['output_path']).read_text(encoding='utf-8'))
+            self.assertFalse(summary['hypothesis_testing_performed'])
+            self.assertEqual(summary['data_scope'], 'real_secondary_data_extracted_from_bibliography')
+            self.assertTrue(Path(cfg['derived_path']).is_file())
         self.assertNotIn('mean_pct_change', run_benchmark.__doc__ or '')
 
     def test_config_and_bib_and_docs(self):

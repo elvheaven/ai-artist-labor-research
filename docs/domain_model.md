@@ -8,7 +8,7 @@
 
 This repository has **two distinct analytical strands**:
 
-1. **Research synthesis:** `data/sample/sample_dataset.csv` contains **illustrative, unverified numbers** associated with RQ1 (paid work), RQ2 (asset sales), and RQ3 (creative autonomy). The before/after counts are teaching examples, **not quotations from publications**. The BibTeX entries identify relevant literature but do not authenticate these invented counts.
+1. **Research synthesis:** `data/extracted/` holds **real secondary data read from the bibliography** (effect estimates with standard errors, survey proportions, qualitative themes) for RQ1 (paid work), RQ2 (asset sales) and RQ3 (creative autonomy). Each row records its location in the source and a verification status. The suitability of the sources and their gaps are assessed in [`source_assessment.md`](source_assessment.md).
 2. **Task 3 IT testbed:** `src/benchmark.py --generate-raw` creates **synthetic** JSONL latency/error events for a hypothetical baseline and proposed workflow. This is useful for demonstrating data cleaning, confidence intervals, validation, and charts. It does **not** send real requests at 50–250 RPS, time a live algorithm, or establish labor-market effects.
 
 The technical benchmark is a methodological demonstration of the research pipeline, **not empirical evidence for hypotheses RQ1–RQ3**.
@@ -19,7 +19,7 @@ The technical benchmark is a methodological demonstration of the research pipeli
 flowchart LR
     R[Student researcher]
     S[AI artist labor research repository]
-    L[(Bibliography and illustrative study examples)]
+    L[(Bibliography and extracted study data)]
     O[(Versioned CSV, notebook, PDF/PNG figures)]
     R -->|Runs scripts and audits findings| S
     L -->|Bibliography and teaching data| S
@@ -54,7 +54,7 @@ flowchart TD
     Viz --> Figures[(reports/figures — PDF and 300 DPI PNG)]
     Summary --> NB[Executed Jupyter notebook]
     Figures --> NB
-    Study[(data/sample/sample_dataset.csv — illustrative values)] --> Audit[Descriptive grouping by RQ1–RQ3]
+    Study[(data/extracted/*.csv — real extracted data)] --> Audit[Extraction audit and derived re-expression by RQ1–RQ3]
     Audit --> NB
 ```
 
@@ -62,11 +62,11 @@ flowchart TD
 
 ## 3. Mathematical formalization (LaTeX)
 
-For a *comparable* outcome in one study with nonzero before value:
+For a *comparable* outcome with a reported before value (arithmetic re-expression only; the extracted data mostly store the authors' own coefficients):
 
 $$\Delta_i = 100\frac{Y_{i,\mathrm{after}}-Y_{i,\mathrm{before}}}{Y_{i,\mathrm{before}}}\%.$$
 
-**Do not pool** $\Delta_i$ from earnings, counts of jobs, creative-autonomy ratings, and productivity into a single meaningful estimate. The seven sample rows are illustrative and therefore **no t-test, Wilcoxon test or binomial p-value is reported**. Authentic study-level estimates, corresponding uncertainties, sample sizes, and harmonized outcome definitions would be required first.
+**Do not pool** $\Delta_i$ from earnings, counts of jobs, creative-autonomy ratings, and productivity into a single meaningful estimate. Extracted estimates come from different designs and populations, so **no pooled estimate, t-test, Wilcoxon test or binomial p-value is reported**. For log-coefficient rows the audit adds $100(e^{b}-1)\%$ and $z=b/\mathrm{SE}$ as arithmetic re-expressions of the authors' reported values; harmonized outcome definitions and several comparable estimates with uncertainties would be required before any synthesis.
 
 Given $N_W$ *evaluation-phase* requests in scenario stratum $W=(\mathrm{method},\mathrm{load\_rps})$, with error indicator $e_j$:
 
@@ -105,7 +105,7 @@ The bootstrap interval quantifies the variability of the **simulated model outpu
 
 | Domain entity | Responsibility |
 |---|---|
-| `StudyExample` | One *illustrative*, source-linked (but unverified) example classified as RQ1, RQ2, RQ3 or CONTEXT |
+| `ExtractedEstimate` | One reported estimate, survey proportion or theme with source location and verification status, classified as RQ1, RQ2, RQ3 or CONTEXT |
 | `BenchmarkScenario` | Seed, workload label, baseline/proposed model assumptions |
 | `MeasurementLog` | Timestamped simulated run with phase, status, error code and latency |
 | `GuardrailResult` | Condition-specific pass/breach with failures in denominator |

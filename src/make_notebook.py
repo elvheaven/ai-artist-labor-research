@@ -35,7 +35,7 @@ def build():
 
 ## Scope and validity
 
-Two independent strands are included: (1) an **unverified illustrative dataset** for research questions RQ1–RQ3 and (2) a **simulated** workload/latency testbed for Task 3 data-engineering methods. Simulated latencies are Gaussian samples, **not measured real requests or real speedup**. The illustrative study values cannot support t-test, Wilcoxon, or binomial conclusions about artists. The benchmark demonstrates reproducible schema validation, guardrails, uncertainty quantification, and scientific graphics.
+Two independent strands are included: (1) **real secondary data extracted from the bibliography** (effect estimates, survey proportions and qualitative themes) for research questions RQ1–RQ3 and (2) a **simulated** workload/latency testbed for Task 3 data-engineering methods. Simulated latencies are Gaussian samples, **not measured real requests or real speedup**. The extracted study values are reported estimates from different designs and populations; they are shown side by side, are **not pooled**, and no new hypothesis test is run on them. The benchmark demonstrates reproducible schema validation, guardrails, uncertainty quantification, and scientific graphics.
 
 We report successful-request latency **conditionally on success** and failure rate on **all evaluation attempts**. The simulated 250 RPS proposed scenario deliberately breaches the 10% error-rate guardrail; this is a documented failure, not a passing result.
 '''),
@@ -94,21 +94,28 @@ display(summary.loc[summary['guardrail_status'].str.startswith('BREACHED'),
 print('Flagged IQR candidates (not deleted):', int(clean['is_outlier'].sum()))
 '''),
         md(r'''
-## 4. Research example audit — RQ1/RQ2/RQ3
+## 4. Extracted research data — RQ1/RQ2/RQ3
 
-The seven **illustrative** rows are intentionally separated into research domains to avoid a scientifically invalid pooled mean of wages, sales, productivity, and autonomy. Values are marked `illustrative_unverified` and **are not extracted primary-source effect estimates**. The bibliography is an inventory of potentially relevant references, not independent validation of these fabricated demonstration counts. Hypothesis p-values are not calculated because the necessary verified study-level or participant-level samples are unavailable.
+Numbers in `data/extracted/` were read from the full text of the bibliography entries (or, where flagged `abstract_or_secondary`, from abstracts and secondary reports) and keep a `location_in_source` and a `verification_status`. Effects are **kept separate by research question and outcome**: paid work (RQ1), human-made asset sales (RQ2), and creative productivity (context) are not comparable and are never averaged. Derived columns (`derived_pct`, `z_reported`) only re-express the authors' own coefficients and standard errors.
 '''),
         code(r'''
-examples = pd.read_csv(ROOT / 'data/sample/sample_dataset.csv')
-assert examples['data_provenance'].eq('illustrative_unverified').all()
-assert np.allclose((examples['value_after']-examples['value_before']) /
-                   examples['value_before'] * 100, examples['pct_change'], atol=.15)
-print('Illustrative example counts by research question:')
-display(examples.groupby('research_question', as_index=False).agg(
-    illustrative_rows=('study_id','count'), metrics=('metric_name', lambda x: ', '.join(x))))
-display(examples[['study_id','research_question','metric_name',
-                  'pct_change','source_bib_key','data_provenance']])
-print('NO hypothesis significance claim; the rows cannot be pooled across outcomes.')
+from src.benchmark import derive_effect_columns
+effects = derive_effect_columns(pd.read_csv(ROOT / 'data/extracted/effect_estimates.csv'))
+survey = pd.read_csv(ROOT / 'data/extracted/survey_items.csv')
+themes = pd.read_csv(ROOT / 'data/extracted/qualitative_themes.csv')
+assert effects['verification_status'].isin(
+    ['fulltext_cross_checked', 'fulltext_single_read', 'abstract_or_secondary', 'not_retrieved']).all()
+print('Effect rows by research question and verification status:')
+display(effects.groupby(['rq', 'bib_key', 'verification_status']).size().rename('rows').reset_index())
+print('Main RQ1 and RQ2 estimates (reported coefficient, SE, and arithmetic re-expression):')
+main_ids = ['HUI-01', 'HUI-02', 'HUI-03', 'DEM-01', 'GL-01', 'GL-02', 'GL-04', 'GL-05']
+display(effects.loc[effects.effect_id.isin(main_ids),
+        ['effect_id', 'rq', 'outcome', 'estimate', 'estimate_unit', 'se', 'derived_pct', 'verification_status']].round(3))
+print('Survey proportions (professional visual artists, Jiang et al. 2026, n=378):')
+display(survey.loc[survey.bib_key.str.startswith('jiang') & survey.rq.isin(['RQ1', 'RQ3']),
+        ['item_id', 'construct', 'response_category', 'value_pct']])
+print(f'Qualitative themes: {len(themes)} from {themes.bib_key.nunique()} sources (no prevalence claims).')
+print('NO pooled estimate and NO new hypothesis test: outcomes, units and populations differ across studies.')
 '''),
         md(r'''
 ## 5. Three scientific visualization rules

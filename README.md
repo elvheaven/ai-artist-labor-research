@@ -11,31 +11,38 @@ This project investigates employment opportunities, human-created asset sales, a
 
 **Do not confuse these strands.** The 260 logged latencies are **generated Gaussian model draws**, *not wall-clock measurements or genuine HTTP throughput*. The 50–250 requests/s labels describe hypothetical load scenarios, not verified achieved RPS. The testbed does **not** prove generative AI's impact on artists or any speedup on real hardware.
 
-The seven before/after study rows in [`data/sample/sample_dataset.csv`](data/sample/sample_dataset.csv) have been explicitly marked `illustrative_unverified`: they were **not extracted as verified source-level data**. They are examples for validating arithmetic and schema, not evidence supporting hypothesis tests. The 11 BibTeX records include peer-reviewed proceedings/journal papers and other research/working-paper material; claiming all are peer-reviewed is unwarranted. See [`docs/Zhansaya_Zhanerke.bib`](docs/Zhansaya_Zhanerke.bib).
+The study rows are **real secondary data extracted from the bibliography**: 51 effect estimates, 76 survey-response rows and 20 qualitative themes in [`data/extracted/`](data/extracted/). Every row records where in the source it came from and how it was verified; nothing is pooled across unlike outcomes and no new hypothesis test is run. The earlier seven invented teaching rows were removed. How suitable the library is for a mixed-methods secondary-data design, what the sources get wrong internally, and what to add are in [`docs/source_assessment.md`](docs/source_assessment.md). The 14 BibTeX records include peer-reviewed proceedings/journal papers and working papers; claiming all are peer-reviewed is unwarranted. See [`docs/Zhansaya_Zhanerke.bib`](docs/Zhansaya_Zhanerke.bib).
 
 ## Research questions and evidence boundaries
 
 | Question | Scope | Available material | Current conclusion |
 |---|---|---|---|
-| **RQ1** — Paid work | Postings, earnings and labor conditions | Literature inventory; 3 illustrative teaching rows | No valid pooled numerical estimate or p-value from provided rows |
-| **RQ2** — Human-created sales | Asset listings, sales and policy exposure | Literature inventory; 1 illustrative teaching row | No valid quantitative policy effect or causal claim |
-| **RQ3** — Creative autonomy | Artist experiences, workflow changes and decision-making | Qualitative references; 2 illustrative teaching rows | No participant-level counts to run a valid binomial test |
-| Context | AI-assisted productivity | 1 illustrative teaching row | Not pooled with earnings, sales or autonomy |
+| **RQ1** — Paid work | Postings, earnings and labor conditions | Hui et al. (SEs extracted); Demirci et al. and Makridis (abstract level); Jiang et al. self-reported income items | Image-related freelance jobs −2.1% and income −5.2% (Hui et al.); −17% image postings (Demirci et al., abstract). No pooled estimate: only one study has SEs |
+| **RQ2** — Human-created sales | Asset listings, sales and policy exposure | Goldberg & Lam DiD tables (single platform, working paper) | Human sales −0.379 log points (SE 0.058) after the platform GenAI policy; one study, no generalisation |
+| **RQ3** — Creative autonomy | Artist experiences, workflow changes and decision-making | Jiang et al. (N=378) and Lovato et al. (N=459) proportions; Kyi et al. and Jiang et al. themes | Descriptive and qualitative synthesis; "autonomy" is not measured directly and item denominators are missing, so the planned binomial test is not valid |
+| Context | AI-assisted productivity | Zhou & Lee event-study figures | Output +50%/+100% early, +25% long run; not pooled with earnings, sales or autonomy |
 
-The bibliography itself contains source summaries that can inform a **careful literature discussion**. For instance, the abstract of Demirci, Hannane & Zhu (2025) reports a 17% decline in image creation job postings; Zhou & Lee (2024) describe a 25% creativity-related productivity increase; and Lovato et al. (2024) describe surveying 459 artists. Those are **source-abstract-level statements**, not validations of the fabricated before/after counts in our demo CSV. [BibTeX records](docs/Zhansaya_Zhanerke.bib). Verified effect estimates, sampling frames, and comparable outcomes are required before testing H0 vs H1. Refer to the [methodology passport](docs/methodology_passport.md).
+The extracted figures (for example the 17% decline in image postings, the 25% productivity gain, or the 459 surveyed artists) come from the papers themselves; where a paper is internally inconsistent, both values are stored and flagged ([`docs/source_assessment.md`](docs/source_assessment.md), section 4). Verified effect estimates, sampling frames, and comparable outcomes are still required before testing H0 vs H1. Refer to the [methodology passport](docs/methodology_passport.md).
 
 ## Architecture and Task 3 file structure
 
 ```text
 ai-artist-labor-research/
 ├── data/
-│   ├── sample/sample_dataset.csv          # illustrative, unverified study examples
+│   ├── extracted/                         # REAL secondary data read from the bibliography
+│   │   ├── effect_estimates.csv           # 51 reported estimates with SE, design, source location
+│   │   ├── survey_items.csv               # survey proportions (Lovato 2024, Jiang 2026)
+│   │   ├── qualitative_themes.csv         # themes (Jiang 2026, Kyi 2025)
+│   │   ├── source_register.csv            # suitability tier and limits per bibliography entry
+│   │   └── candidate_sources.csv          # sources to add, with quality flags
 │   ├── raw/test_run.jsonl                 # 260 simulated JSONL records
 │   └── processed/
 │       ├── benchmark_clean.csv           # 240 evaluation records, including failures
+│       ├── effect_estimates_derived.csv  # log coefficients re-expressed as percent; z from reported SE
 │       └── metrics_summary.csv           # matched-load comparison, CI, guardrail
 ├── docs/
 │   ├── domain_model.md                   # C4 + MCP + LaTeX + notation table
+│   ├── source_assessment.md              # suitability of the library, gaps, extra sources
 │   ├── methodology_passport.md
 │   └── Zhansaya_Zhanerke.bib
 ├── notebooks/01_data_analysis.ipynb       # executed, outputs saved
@@ -118,7 +125,7 @@ Tested with Python 3.13, pandas 2.2.3, NumPy 2.3.5, matplotlib 3.10.8, seaborn 0
 Run from the **repository root**, in this order:
 
 ```bash
-python src/benchmark.py --config config.json  # checks illustrative sample; no pooled inference
+python src/benchmark.py --config config.json  # audits extracted real data; no pooled inference
 python src/benchmark.py --generate-raw         # generates deterministic modeled JSONL
 python src/process_data.py                    # exports all processed rows and 12 stats rows
 python src/visualize.py                       # regenerates 2 PDFs and 2 PNGs
@@ -133,16 +140,17 @@ python src/process_data.py --strict
 # Expected exit code 2: Proposed @ 250 RPS simulated error rate exceeds 10%.
 ```
 
-You can also open `notebooks/01_data_analysis.ipynb` and choose **Kernel → Restart & Run All**. All seven code cells in the submitted notebook have saved outputs; code is imported from `src/` rather than duplicated in the notebook. The notebook includes a separate, non-inferential inspection of illustrative research examples.
+You can also open `notebooks/01_data_analysis.ipynb` and choose **Kernel → Restart & Run All**. All seven code cells in the submitted notebook have saved outputs; code is imported from `src/` rather than duplicated in the notebook. The notebook includes a separate, non-inferential display of the extracted research data.
 
 ## Validity, ethical scope and limitations
 
-- **Do not claim** that seven unrelated percent changes establish an average impact of AI on commercial artists; the outcome units and populations are incomparable.
-- **Do not claim** the sample teaching numbers reflect the papers by Goldberg & Lam, Hui et al., Jiang et al., Lovato et al., or Makridis without checking the primary full text and its actual tables.
+- **Do not claim** that percent changes from different studies establish an average impact of AI on commercial artists; outcomes, units, platforms and populations are incomparable.
+- **Do not claim** extracted numbers beyond what `verification_status` supports: `fulltext_single_read` rows still need a human check against the cited table or figure, and `abstract_or_secondary` rows (Demirci et al., Makridis) are headline-level only.
+- **Do not claim** that online-freelance results (Hui et al., Demirci et al.) describe all commercial illustrators, or that the non-probability artist surveys represent the profession.
 - **Do not claim** that scenario labels are generated live HTTP traffic or that Gaussian draws are stopwatch measurements.
 - **Do report** both failure rates and conditional-on-success latencies; statistics from successes alone would conceal selection bias otherwise.
 - **Do disclose** the deliberate 250 RPS guardrail breach and the limitations of per-group bootstrap CIs for small correlated/non-independent samples.
-- **Next evidence step:** verify and manually extract effect sizes from primary papers; group by RQ and comparable outcome, report actual sample sizes and uncertainty, and only then perform justified hypothesis tests.
+- **Next evidence step:** read the Demirci et al. and Makridis PDFs, spot-check single-read rows, add the priority sources listed in `docs/source_assessment.md`, then group by RQ and comparable outcome and perform only justified tests.
 
 ## Domain model and bibliography
 

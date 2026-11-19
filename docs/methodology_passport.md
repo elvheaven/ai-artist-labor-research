@@ -9,9 +9,9 @@
 
 | RQ | Question | Intended outcome | What can be concluded from this repository? |
 |---|---|---|---|
-| RQ1 | How has text-to-image AI diffusion been associated with paid commissions, job postings and compensation? | Separate measures of paid work, compensation and postings | Bibliographic synthesis is possible; the sample CSV is illustrative and cannot establish significance |
-| RQ2 | How does platform permission for generative assets relate to human-created asset production/sales? | Platform-specific sales or revenue with an explicit policy and comparison group | One unverified example row; no causal or statistical inference |
-| RQ3 | How is creative autonomy/work allocation changing for illustrators? | Interview themes or valid participant-level autonomy surveys | Descriptive and qualitative synthesis only; no participant-level numerator/denominator for a binomial test |
+| RQ1 | How has text-to-image AI diffusion been associated with paid commissions, job postings and compensation? | Separate measures of paid work, compensation and postings | Extracted: Hui et al. (SEs), Demirci et al. (abstract level), Makridis (direction only). Only one study has SEs, so no pooled estimate |
+| RQ2 | How does platform permission for generative assets relate to human-created asset production/sales? | Platform-specific sales or revenue with an explicit policy and comparison group | Extracted: Goldberg & Lam DiD tables (one platform, working paper); no generalisation |
+| RQ3 | How is creative autonomy/work allocation changing for illustrators? | Interview themes or valid participant-level autonomy surveys | Descriptive and qualitative synthesis (Jiang et al., Lovato et al., Kyi et al.); no direct autonomy measure and no item denominators for a valid binomial test |
 
 ### Hypotheses are preregistered research goals, not results
 
@@ -19,7 +19,7 @@
 - **RQ2 H0:** no decrease in human asset sales following platform-policy exposure; **H1:** decrease. Credible comparison groups and policy timing are needed to separate association from causation.
 - **RQ3 H0:** at most 50% of a defined population experiences loss of creative autonomy; **H1:** more than 50%. A binomial test requires observed participant counts and sampling design; these are **not** provided by the demo CSV.
 
-**Important:** The seven illustrative `ST01`–`ST07` rows in `data/sample/sample_dataset.csv` are tagged `illustrative_unverified`. Their before/after counts and percentages must **not** be cited as factual findings of named articles. We intentionally do not compute a pooled mean across incompatible metrics or fabricate p-values. Some abstracts in the BibTeX independently mention selected numbers, but that does not validate invented row-level before/after counts.
+**Important:** The earlier invented teaching rows (`ST01`–`ST07`) were removed. Study values now come from `data/extracted/` and were read from the papers; each row has `location_in_source` and `verification_status`. Some entries are internally inconsistent in their own papers (for example Goldberg & Lam +78% vs +119% images, Zhou & Lee 25% vs 50%/100% productivity); both values are stored and flagged, see [`source_assessment.md`](source_assessment.md). We do not compute a pooled mean across incompatible metrics or new p-values.
 
 ## Study-selection and extraction protocol (required before empirical claims)
 
@@ -51,7 +51,7 @@ The separate testbed in `src/benchmark.py` generates **260 synthetic JSONL rows*
 | Outlier candidates | 1.5×IQR fences within each method × load | Flag without removing successful rows |
 | Uncertainty | 95% percentile bootstrap of simulated successful latencies | 10,000 resamples; seed 42 |
 | Plot quality | Explicit axis units, 95% CIs, accessible palette plus line/marker distinctions | Export both 300 DPI PNG and vector PDF |
-| Source provenance | Study numbers must be independently checked | Demo rows remain labeled unverified; cannot support hypothesis rejection |
+| Source provenance | Study numbers must be independently checked | Every row carries `verification_status`; `fulltext_single_read` and `abstract_or_secondary` rows are not final until spot-checked |
 
 In the committed sample, Proposed @ 250 RPS has a **12.50%** simulated failure rate and **BREACHES** the 10% threshold, even though overall Proposed is 4.17%. The breach is **not repaired by hiding data or tuning results**. `python src/process_data.py` emits the CSV and prints a warning; `python src/process_data.py --strict` still writes the audit artifacts but exits with **code 2** so a validation job can block release. This is an *implemented CLI gate*, not a claim that CI/CD is connected.
 
